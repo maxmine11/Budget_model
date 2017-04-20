@@ -2,7 +2,7 @@ import numpy as np
 from os.path import dirname, join
 from bokeh.plotting import figure , curdoc #show,output_file
 import pandas as pd
-from bokeh.models.widgets import Slider, Select, TextInput, Panel, Tabs
+from bokeh.models.widgets import Slider, Select, TextInput, Panel, Tabs, Button
 from bokeh.models import HoverTool, BoxSelectTool, Div
 
 from bokeh.layouts import widgetbox, layout,row, column
@@ -30,13 +30,15 @@ class Operator:
     def __init__(self,data):
         """Create an operator with a given section with the given exit.
 
-        name -- A string; the name of this Place.
-        exit -- The Place reached by exiting this Place (may be None).
+        base-- An array of indices to create the base case with base levelers.
+        data-- Copy of the original data set.
+        years-- 2014-2020.
         """
         self.base_levels=np.array([1.5,2.0,0.0,0.0,2.0,2.0,0.0,1.5,1.5,1.5,0.0,1.5,0.0,0.0])
         self.data=np.copy(data)
         self.years_update=data.shape[1]
     def leveler(self, section, assumption):
+        assumption=assumption/10.0
         i=4
         while(i < self.years_update):    
             newEntry=self.data[section,i-1]*(1.0+assumption)
@@ -46,7 +48,7 @@ class Operator:
         totalExps=np.sum(self.data[8:-2,:],axis=0)
         depreciation=np.sum(self.data[-2:,:],axis=0)
         new_data=totalRevs-totalExps-depreciation
-        return new_data/1000
+        return new_data/1000.0
     #Creates case using base_levels for all operators
     def basecase(self):
         section=0
@@ -55,6 +57,8 @@ class Operator:
             initial[4:]=self.leveler(section,i)[4:]
             section+=1
         return initial
+
+################################## Graph arrangement #####################################################################
             
 years=np.linspace(2014,2020,7) # 4 base years and 3 years being operating one. 7 operating years
 operator1=Operator(Svalues)
@@ -69,7 +73,7 @@ hover = HoverTool(
     )
 
 TOOLS = [BoxSelectTool(), hover, 'crosshair']
-model = figure(title="Budget Model", plot_height=600, plot_width=800,tools=TOOLS) 
+model = figure(title="Budget Model", plot_height=600, plot_width=1000,tools=TOOLS) 
 r = model.line(years,y1, color="#2222aa", line_width=2,line_dash=[4, 4], legend ="Scenario")
 base=model.line(years,y2, line_width=2,legend="Base Case")
 #Change background color
@@ -92,9 +96,10 @@ model.xgrid.grid_line_alpha = 0.3
 model.ygrid.grid_line_alpha = 0.1
 model.ygrid.grid_line_color = "Black"
 #Change the outline of the plot box
-model.outline_line_width = 10
-model.outline_line_alpha = 0.3
+model.outline_line_width = 4
+model.outline_line_alpha = 0.8
 model.outline_line_color = "navy"
+
 
 
 #Revenues Levelers
@@ -114,6 +119,10 @@ Scholarships = Slider(title="Scholarships and Fellowships (%)",start=-5.0, end=5
 Utilities= Slider(title="Utilities (%)",start=-1.5, end=4.0,step=1.5,value=1.5, callback_policy='mouseup')
 Supplies= Slider(title="Supplies (%)",start=-5.0, end=5.0,step=2.5,value=0.0,callback_policy='mouseup')
 Othere= Slider(title="Other (%)",start=-5.0, end=5.0,step=2.5,value=0.0,callback_policy='mouseup')
+
+#other interactions 
+
+button = Button(label="Reset", color="blue")
 
 #Interacting widgets for Revenues
 def update_tuition(attrname, old, new):
@@ -139,7 +148,7 @@ def update_pell_grants(attrname, old, new):
 Pell_grants.on_change('value', update_pell_grants)
 
 def update_contracts(attrname, old, new):
-    value = Contracs.value
+    value = Contracts.value
     new_data=operator1.leveler(3, value)
     r.data_source.data['y'] = new_data
 Contracts.on_change('value', update_contracts)
@@ -157,21 +166,21 @@ def update_private_gifts(attrname, old, new):
     new_data=operator1.leveler(5,value)
     r.data_source.data['y'] = new_data
     
-#Private_gifts.on_change('value', update_private_gifts)
+Private_gifts.on_change('value', update_private_gifts)
 
 def update_investment_income(attrname, old, new):
     value = Investment_income.value
     new_data=operator1.leveler(6, value)
     r.data_source.data['y'] = new_data
     
-#Investment_income.on_change('value', update_investment_income)
+Investment_income.on_change('value', update_investment_income)
 
 def update_otherr(attrname, old, new):
     value= Otherr.value
     new_data=operator1.leveler(7,value )
     r.data_source.data['y'] = new_data
     
-#Otherr.on_change('value', update_otherr)
+Otherr.on_change('value', update_otherr)
 
     
 #Interacting widgets for expenses
@@ -181,7 +190,7 @@ def update_salaries(attrname, old, new):
     new_data=operator1.leveler(8, value)
     r.data_source.data['y'] = new_data
     
-#Salaries.on_change('value', update_salaries)
+Salaries.on_change('value', update_salaries)
 
 
     
@@ -206,6 +215,7 @@ def update_utilities(attrname, old, new):
     value = Utilities.value
     new_data=operator1.leveler(11, value)
     r.data_source.data['y'] = new_data
+
 Utilities.on_change('value', update_utilities)
 
     
@@ -222,7 +232,32 @@ def update_othere(attrname, old, new):
     value = Othere.value
     new_data=operator1.leveler(13, value)
     r.data_source.data['y'] = new_data
+
 Othere.on_change('value', update_othere)
+
+def update_reset():
+    new_data=operator1.basecase()
+    #Revenues
+    Tuition.value = 1.5
+    State.value = 2.0
+    Pell_grants.value = 0.0
+    Contracts.value = 0.0
+    Educational_activities.value = 2.0
+    Private_gifts.value = 2.0
+    Investment_income.value = 0.0
+    Otherr.value = 1.5
+
+    #Expenses Levelers
+    Salaries.value = 1.5
+    Benefits.value = 1.5
+    Scholarships.value = 0.0
+    Utilities.value= 1.5
+    Supplies.value= 0.0
+    Othere.value= 0.0
+
+    r.data_source.data['y'] = new_data
+
+button.on_click(update_reset) 
 
 revenues=[Tuition,State, Pell_grants,Contracts,Educational_activities,Private_gifts,Investment_income,Otherr]
 expenses=[Salaries,Benefits,Scholarships,Utilities,Supplies,Othere]
@@ -231,7 +266,8 @@ Expenses= widgetbox(*expenses, sizing_mode='fixed')
 tab1 = Panel(child=Revenues, title="Revenues")
 tab2 = Panel(child=Expenses, title="Expenses")
 tabs = Tabs(tabs=[ tab1, tab2 ])
-l=layout([[desc],
+
+l=layout([[desc],[widgetbox(button,sizing_mode='fixed')],
     [tabs,model]], sizing_mode='fixed')
 #show(l)
 
